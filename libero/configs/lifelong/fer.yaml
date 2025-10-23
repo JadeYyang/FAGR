@@ -1,0 +1,9 @@
+algo: fer
+dim: 530
+sample_size: 16 #总的重要特征
+extra_dim: 9
+select_sample: 36 #挑选的重要特征
+generated_samples: 32 #生成多少组
+sample_size_per_task: 32 #过去任务总的特征
+use_cluster_sample: True
+use_random_sample: False

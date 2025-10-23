@@ -1,0 +1,32 @@
+policy_type: BCDiffusionPolicy
+image_embed_size: 64
+text_embed_size: 32
+cond_predict_scale: true
+
+diffusion_step_embed_dim: 128
+down_dims:
+- 256  
+- 512 
+- 1024
+
+horizon: 16
+kernel_size: 5
+n_action_steps: 8
+n_groups: 8
+n_obs_steps: 2
+noise_scheduler:
+  beta_end: 0.02
+  beta_schedule: squaredcos_cap_v2
+  beta_start: 0.0001
+  clip_sample: true
+  num_train_timesteps: 100
+  prediction_type: epsilon
+  variance_type: fixed_small
+num_inference_steps: 100
+image_encoder_hot: False
+
+defaults:
+    # - data_augmentation@color_aug: batch_wise_img_color_jitter_group_aug.yaml
+    # - data_augmentation@translation_aug: translation_aug.yaml
+    - image_encoder: resnet_encoder
+    - language_encoder: mlp_encoder

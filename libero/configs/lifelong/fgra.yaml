@@ -1,0 +1,11 @@
+algo: FGRA
+sample_size: 16
+past_batch_size: 32
+samples_per_cluster: 20
+encoder_dim: 512
+extra_dim: 9
+shrinkage_factor: 0.75
+confidence_threshold: 3
+sample_interpolation: 160
+save_cluster: False
+save_path: "/data/datasets/yys/LIBERO/jade/FGR_cluster/OBJECT"
