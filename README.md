@@ -11,6 +11,11 @@ To the best of our knowledge, **this work is the first to explore generative rep
 
 ---
 
+## 🚀 Quick Start
+
+**Implementation documentation will come soon.**
+
+---
 
 ## 📝 Citation
 
@@ -33,5 +38,10 @@ For questions or collaborations, please contact:
 - **Yushi Yang**: yangyushi2023@ia.ac.cn
 
 ---
+# License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+---
 
+# Acknowledgements
+1. We would like to thank the authors of [LIBERO](https://lifelong-robot-learning.github.io/LIBERO/) for providing the datasets, environments and codebase for our experiments.
