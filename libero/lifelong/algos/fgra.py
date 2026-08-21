@@ -1,3 +1,5 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -43,6 +45,12 @@ class FGRA(Sequential):
         self.past_batch_size = self.cfg.lifelong.past_batch_size
         self.confidence_threshold = self.cfg.lifelong.confidence_threshold
         self.action_step = cfg.policy.n_action_steps
+        self.replay_pool_size_per_task = int(
+            getattr(self.cfg.lifelong, "replay_pool_size_per_task", self.past_batch_size)
+        )
+        self.replay_max_attempts = int(
+            getattr(self.cfg.lifelong, "replay_max_attempts", 10)
+        )
 
     def start_task(self, task):
         super().start_task(task)
@@ -85,10 +93,17 @@ class FGRA(Sequential):
         
         final_features = []
         final_actions = []
-        max_attempts = 3  
+        target_size = max(
+            self.past_batch_size,
+            self.replay_pool_size_per_task * self.current_task,
+        )
+        max_attempts = self.replay_max_attempts
         attempt = 0
         
-        while attempt < max_attempts:
+        while (
+            attempt < max_attempts
+            and sum(x.shape[0] for x in final_features) < target_size
+        ):
             attempt += 1
 
             generated_features, cluster_indices = self._generate_features(
@@ -103,7 +118,11 @@ class FGRA(Sequential):
                 final_actions.append(filtered_actions)
         
         if not final_features:
-            return None, None
+            raise RuntimeError(
+                "FGRA replay filtering accepted zero samples after "
+                f"{max_attempts} attempts. Increase lifelong.replay_max_attempts "
+                "or relax lifelong.confidence_threshold."
+            )
             
         return torch.cat(final_features, dim=0), torch.cat(final_actions, dim=0)
 
@@ -227,8 +246,21 @@ class FGRA(Sequential):
                 self.sampling_indices = set()
 
         total_samples = self.past_features_pool.shape[0]
+        if total_samples == 0:
+            raise RuntimeError("FGRA replay pool is empty")
         available_indices = list(set(range(total_samples)) - self.sampling_indices)
-        selected_indices = torch.tensor(random.sample(available_indices, self.past_batch_size))
+        if len(available_indices) < self.past_batch_size:
+            self.sampling_indices = set()
+            available_indices = list(range(total_samples))
+        if total_samples >= self.past_batch_size:
+            selected = random.sample(available_indices, self.past_batch_size)
+        else:
+            selected = random.choices(available_indices, k=self.past_batch_size)
+        selected_indices = torch.tensor(
+            selected,
+            dtype=torch.long,
+            device=self.past_features_pool.device,
+        )
         self.sampling_indices.update(selected_indices.tolist())
         
         return self.past_features_pool[selected_indices], self.past_actions_pool[selected_indices]
@@ -313,6 +345,12 @@ class FGRA(Sequential):
             seed=self.cfg.seed
         )
 
+        if task_id == 0:
+            torch.save(
+                {"state_dict": self.encoder.state_dict()},
+                os.path.join(self.experiment_dir, "r3m_encoder.pth"),
+            )
+
         self.old_policy = get_policy_class(self.cfg.policy.policy_type)(self.cfg, self.cfg.shape_meta, n_task=self.n_tasks)
         self.old_policy.to(self.cfg.device)
         
@@ -322,6 +360,7 @@ class FGRA(Sequential):
 
         for param in self.old_policy.parameters():
             param.requires_grad = False  
+        self.old_policy.eval()
 
     def merge_data(self, data_list):
         n = len(data_list)  

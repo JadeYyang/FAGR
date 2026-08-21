@@ -1,0 +1,84 @@
+# @package _global_
+
+# Paper-oriented FAGR configuration. Copy this file to create a custom run.
+defaults:
+  - override /policy: bc_diffusion_policy
+  - override /lifelong: fgra
+  - _self_
+
+benchmark_name: LIBERO_SPATIAL
+max_tasks: null
+seed: 10000
+device: cuda:0
+
+# Paths can be written by scripts/prepare_fagr.py. Set them explicitly here
+# when a run should not depend on ~/.libero/config.yaml.
+folder: null
+bddl_folder: null
+init_states_folder: null
+
+use_r3m: true
+model_name: resnet34
+# null uses the official r3m.load_r3m() downloader and ~/.r3m cache.
+# A directory containing res_34.pt/res_34.yaml remains supported.
+r3m_folder: null
+r3m_dim: 512
+
+data:
+  seq_len: 16
+  task_group_size: 1
+  task_order_index: 0
+  img_h: 128
+  img_w: 128
+  use_eye_in_hand: true
+  use_gripper: true
+  use_joint: true
+  use_ee: false
+
+train:
+  n_epochs: 50
+  batch_size: 32
+  num_workers: 0
+  grad_clip: 100.0
+  use_augmentation: false
+  # The paper reports warm-up but does not state its duration. Keep this
+  # explicit so the exact value used for a result is saved with the run.
+  warmup_epochs: 5
+  optimizer:
+    kwargs:
+      lr: 0.0001
+      betas: [0.9, 0.999]
+      weight_decay: 0.0001
+  scheduler:
+    kwargs:
+      eta_min: 0.00001
+      last_epoch: -1
+
+eval:
+  eval: true
+  n_eval: 20
+  eval_every: 5
+  max_steps: 600
+  use_mp: true
+  num_procs: 20
+
+policy:
+  # Architecture reported in the paper (21.1M-parameter variant).
+  down_dims: [128, 256, 512]
+  horizon: 16
+  n_action_steps: 8
+  n_obs_steps: 2
+  num_inference_steps: 100
+
+lifelong:
+  sample_size: 16
+  past_batch_size: 32
+  samples_per_cluster: 20
+  encoder_dim: 512
+  extra_dim: 9
+  shrinkage_factor: 0.75
+  confidence_threshold: 3.0
+  replay_pool_size_per_task: 160
+  replay_max_attempts: 10
+  save_cluster: false
+  save_path: ./experiments/fagr_clusters

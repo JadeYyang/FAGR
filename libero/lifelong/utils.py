@@ -44,15 +44,17 @@ class NpEncoder(json.JSONEncoder):
             return super(NpEncoder, self).default(obj)
 
 
-def torch_save_model(model, model_path, cfg=None, previous_masks=None):
-    torch.save(
-        {
-            "state_dict": model.state_dict(),
-            "cfg": cfg,
-            "previous_masks": previous_masks,
-        },
-        model_path,
-    )
+def torch_save_model(
+    model, model_path, cfg=None, previous_masks=None, encoder=None
+):
+    checkpoint = {
+        "state_dict": model.state_dict(),
+        "cfg": cfg,
+        "previous_masks": previous_masks,
+    }
+    if encoder is not None:
+        checkpoint["encoder_state_dict"] = encoder.state_dict()
+    torch.save(checkpoint, model_path)
 
 
 def torch_load_model(model_path, map_location=None):

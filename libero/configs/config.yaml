@@ -7,6 +7,7 @@ defaults:
   - train: default
   - eval: default
   - lifelong: base
+  - experiment: null
   - test: null
 
 seed: 10000
@@ -26,3 +27,4 @@ r3m_dim: 512
 r3m_folder: null
 model_name: res_34
 benchmark_name: "LIBERO_SPATIAL"
+max_tasks: null

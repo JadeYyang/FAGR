@@ -59,6 +59,19 @@ def main(hydra_cfg):
 
     benchmark = get_benchmark(cfg.benchmark_name)(cfg.data.task_order_index)
     n_manip_tasks = benchmark.n_tasks
+    if cfg.max_tasks is not None:
+        if int(cfg.max_tasks) <= 0:
+            raise ValueError("max_tasks must be a positive integer or null")
+        n_manip_tasks = min(n_manip_tasks, int(cfg.max_tasks))
+
+    if cfg.lifelong.algo in ("FGR", "FGRA"):
+        if cfg.policy.policy_type != "BCDiffusionPolicy":
+            raise ValueError(
+                f"{cfg.lifelong.algo} requires policy=bc_diffusion_policy; "
+                f"got {cfg.policy.policy_type}"
+            )
+        if not cfg.use_r3m:
+            raise ValueError(f"{cfg.lifelong.algo} requires use_r3m=true")
     # prepare datasets from the benchmark
     manip_datasets = []
     descriptions = []
@@ -76,10 +89,13 @@ def main(hydra_cfg):
                 seq_len=cfg.data.seq_len,
             )
         except Exception as e:
-            print(
-                f"[error] failed to load task {i} name {benchmark.get_task_names()[i]}"
+            dataset_path = os.path.join(
+                cfg.folder, benchmark.get_task_demonstration(i)
             )
-            print(f"[error] {e}")
+            raise RuntimeError(
+                f"failed to load task {i} ({benchmark.get_task_names()[i]}) "
+                f"from {dataset_path}: {e}"
+            ) from e
         print(os.path.join(cfg.folder, benchmark.get_task_demonstration(i)))
         # add language to the vision dataset, hence we call vl_dataset
         task_description = benchmark.get_task(i).language

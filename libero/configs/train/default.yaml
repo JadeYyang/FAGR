@@ -9,6 +9,7 @@ max_step: 9999999999
 resume: false
 resume_path: ""
 debug: false
+warmup_epochs: 0
 
 use_augmentation: true
 

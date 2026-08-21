@@ -99,11 +99,42 @@ class Sequential(nn.Module, metaclass=AlgoMeta):
 
         self.scheduler = None
         if self.cfg.train.scheduler is not None:
-            self.scheduler = eval(self.cfg.train.scheduler.name)(
-                self.optimizer,
-                T_max=self.cfg.train.n_epochs,
-                **self.cfg.train.scheduler.kwargs,
-            )
+            scheduler_kwargs = dict(self.cfg.train.scheduler.kwargs)
+            warmup_epochs = int(getattr(self.cfg.train, "warmup_epochs", 0))
+            if warmup_epochs > 0:
+                if warmup_epochs >= self.cfg.train.n_epochs:
+                    raise ValueError(
+                        "train.warmup_epochs must be smaller than train.n_epochs"
+                    )
+                base_lr = float(self.cfg.train.optimizer.kwargs.lr)
+                eta_min = float(scheduler_kwargs.get("eta_min", 0.0))
+                start_factor = eta_min / base_lr if base_lr > 0 else 1.0
+                if not 0.0 < start_factor <= 1.0:
+                    raise ValueError(
+                        "warm-up requires 0 < scheduler.eta_min <= optimizer.lr"
+                    )
+                warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
+                    self.optimizer,
+                    start_factor=start_factor,
+                    end_factor=1.0,
+                    total_iters=warmup_epochs,
+                )
+                cosine_scheduler = eval(self.cfg.train.scheduler.name)(
+                    self.optimizer,
+                    T_max=self.cfg.train.n_epochs - warmup_epochs,
+                    **scheduler_kwargs,
+                )
+                self.scheduler = torch.optim.lr_scheduler.SequentialLR(
+                    self.optimizer,
+                    schedulers=[warmup_scheduler, cosine_scheduler],
+                    milestones=[warmup_epochs],
+                )
+            else:
+                self.scheduler = eval(self.cfg.train.scheduler.name)(
+                    self.optimizer,
+                    T_max=self.cfg.train.n_epochs,
+                    **scheduler_kwargs,
+                )
 
     def map_tensor_to_device(self, data):
         """Move data to the device specified by self.cfg.device."""
@@ -218,11 +249,26 @@ class Sequential(nn.Module, metaclass=AlgoMeta):
                 )
                 successes.append(success_rate)
 
+                checkpoint_encoder = (
+                    self.encoder
+                    if self.current_task == 0 and hasattr(self, "encoder")
+                    else None
+                )
                 if prev_success_rate < success_rate:
-                    torch_save_model(self.policy, model_checkpoint_name, cfg=self.cfg)
+                    torch_save_model(
+                        self.policy,
+                        model_checkpoint_name,
+                        cfg=self.cfg,
+                        encoder=checkpoint_encoder,
+                    )
                     prev_success_rate = success_rate
                     idx_at_best_succ = len(losses) - 1
-                torch_save_model(self.policy, last_model_checkpoint_name, cfg=self.cfg)
+                torch_save_model(
+                    self.policy,
+                    last_model_checkpoint_name,
+                    cfg=self.cfg,
+                    encoder=checkpoint_encoder,
+                )
                 t1 = time.time()
 
                 cumulated_counter += 1.0
